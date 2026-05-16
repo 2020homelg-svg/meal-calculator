@@ -9,20 +9,17 @@
 <body class="bg-gray-100 min-h-screen p-4">
     <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         
-        <!-- 頂部頁籤切換 -->
         <div class="flex border-b bg-gray-50">
             <button onclick="switchTab('calc')" id="tab-calc" class="flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600">🍽️ 新增計算</button>
             <button onclick="switchTab('history'); loadHistory();" id="tab-history" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">📊 查看歷史紀錄</button>
         </div>
 
-        <!-- 分頁 1：計算開支 -->
         <div id="page-calc" class="p-6">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">開餐主題 / 餐廳名稱</label>
                 <input type="text" id="mealTitle" placeholder="例如：Deliveroo 麥當勞" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
             </div>
             
-            <!-- 雜費與折扣分開輸入 -->
             <div class="grid grid-cols-3 gap-4 mb-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 text-red-600">總折扣 / 減價 ($)</label>
@@ -53,7 +50,6 @@
             </div>
         </div>
 
-        <!-- 分頁 2：歷史紀錄（唯讀，對數去 Google Sheet 改） -->
         <div id="page-history" class="p-6 hidden">
             <h2 class="text-lg font-bold mb-2 text-gray-800">📋 歷史開支明細</h2>
             <p class="text-xs text-gray-500 mb-4">提示：如需修改「❌ 未付」狀態，請直接打開你的 Google Sheet 進行勾選對數。</p>
@@ -64,7 +60,8 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbzI8w5v7AVbccAywqll8Pj8xyWdz0Rx1ZmYhZdkp9cZ5RdZnw8IS512IFG_2eNWaQGeKQ/exec"; 
+        // 🔗 你的 Google Apps Script 網址
+        const GAS_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnScJ71qCsQH4t-ZersuyVBON1NBzIY7vebylekWAtjOpaxBEqPs8HXywX0-rlaj467rYxuKrWoxgw-9ybbLsv1ttWsAWa5lP6RLHgE2qm4mgqAjVzZ90-qAzAhf0r7tQPUSiSNOVuVIIq4Gacc_10IjYPXrTnUUYdS2QwAzXoZTd7OsqXfg2GeOaYja0N8g1aMaWC9NDC6shYx3Zhtckw-bT54Iq8wvDXGdvd7kpgo1ceMqfZrW8deeL9VXJwfsRvpaASpv81cEJxmAEREJ7hkJV9JiYA&lib=M7k6NXGnfMsFtI582_5dBG-c_nkZ4VGzI"; 
 
         let memberCount = 0;
         let calculatedData = [];
@@ -132,12 +129,13 @@
 
                 total += finalPay;
                 
+                // 🛠️ 【核心修正】：確保這裡的命名跟你的 GAS 後端完全一致！
                 calculatedData.push({ 
                     name: m.name, 
-                    originalPrice: m.price.toFixed(1),
-                    shareFee: individualShareFee.toFixed(1),
-                    shareDiscount: individualShareDiscount.toFixed(1),
-                    finalPrice: finalPay.toFixed(1)
+                    originalPrice: m.price.toFixed(1), // E 欄
+                    shareFee: individualShareFee.toFixed(1), // F 欄
+                    shareDiscount: individualShareDiscount.toFixed(1), // G 欄
+                    finalPrice: finalPay.toFixed(1) // H 欄
                 });
                 
                 resultsDiv.innerHTML += `
@@ -186,11 +184,11 @@
                         <div class="space-y-2">`;
                     
                     group.items.forEach(person => {
-                        const isPaid = person.status.includes('✅');
+                        const isPaid = person.status && person.status.includes('✅');
                         const statusBadge = isPaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
                         boxHTML += `<div class="flex justify-between items-center text-sm">
                             <span>${person.name}: <b class="text-gray-800">$${person.finalPrice}</b></span>
-                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge}">${person.status}</span>
+                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge}">${person.status || '❌ 未付'}</span>
                         </div>`;
                     });
                     boxHTML += `</div></div>`;
