@@ -60,8 +60,7 @@
     </div>
 
     <script>
-        // 🔗 你的 Google Apps Script 網址
-        const GAS_URL = "https://script.google.com/macros/s/AKfycby12dQr-IhllFTBPVuVIYdNCLULxmQQ_ezOAnQwwaX7agimeg5cMQkhTJVMWVeuSWF62w/exec"; 
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec"; 
 
         let memberCount = 0;
         let calculatedData = [];
@@ -129,13 +128,12 @@
 
                 total += finalPay;
                 
-                // 🛠️ 【核心修正】：確保這裡的命名跟你的 GAS 後端完全一致！
                 calculatedData.push({ 
                     name: m.name, 
-                    originalPrice: m.price.toFixed(1), // E 欄
-                    shareFee: individualShareFee.toFixed(1), // F 欄
-                    shareDiscount: individualShareDiscount.toFixed(1), // G 欄
-                    finalPrice: finalPay.toFixed(1) // H 欄
+                    originalPrice: m.price.toFixed(1), 
+                    shareFee: individualShareFee.toFixed(1), 
+                    shareDiscount: individualShareDiscount.toFixed(1), 
+                    finalPrice: finalPay.toFixed(1) 
                 });
                 
                 resultsDiv.innerHTML += `
@@ -186,9 +184,22 @@
                     group.items.forEach(person => {
                         const isPaid = person.status && person.status.includes('✅');
                         const statusBadge = isPaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                        boxHTML += `<div class="flex justify-between items-center text-sm">
-                            <span>${person.name}: <b class="text-gray-800">$${person.finalPrice}</b></span>
-                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge}">${person.status || '❌ 未付'}</span>
+                        
+                        // 🛠️ 【核心修正】：將後端傳回的各項金額轉成浮點數格式化，完美呈現詳細公式與最終應付
+                        const orig = person.originalPrice ? parseFloat(person.originalPrice).toFixed(1) : '0.0';
+                        const fee = person.shareFee ? parseFloat(person.shareFee).toFixed(1) : '0.0';
+                        const disc = person.shareDiscount ? parseFloat(person.shareDiscount).toFixed(1) : '0.0';
+                        const final = person.finalPrice ? parseFloat(person.finalPrice).toFixed(1) : '0.0';
+
+                        boxHTML += `<div class="flex justify-between items-center text-xs border-b border-dashed border-gray-200 py-1">
+                            <div class="flex flex-col md:flex-row md:gap-1">
+                                <span class="font-semibold text-gray-800">${person.name}</span>
+                                <span class="text-gray-400 text-[11px]">(原價$${orig} + 雜$${fee} - 扣$${disc})</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="font-bold text-indigo-600 text-sm">$${final}</span>
+                                <span class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge}">${person.status || '❌ 未付'}</span>
+                            </div>
                         </div>`;
                     });
                     boxHTML += `</div></div>`;
