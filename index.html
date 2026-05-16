@@ -14,7 +14,7 @@
             <button onclick="switchTab('history'); loadHistory();" id="tab-history" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">📊 查看歷史紀錄</button>
         </div>
 
-        <div id="page-calc" class="p-6">
+        <div id="page-calc" class="p-6 hidden">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">開餐主題 / 餐廳名稱</label>
                 <input type="text" id="mealTitle" placeholder="例如：Deliveroo 麥當勞" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
@@ -50,7 +50,7 @@
             </div>
         </div>
 
-        <div id="page-history" class="p-6 hidden">
+        <div id="page-history" class="p-6">
             <h2 class="text-lg font-bold mb-2 text-gray-800">📋 歷史開支明細</h2>
             <p class="text-xs text-gray-500 mb-4">提示：點擊右側的付款狀態按鈕即可切換狀態（需管理員密碼）。</p>
             <div id="historyList" class="space-y-4">
