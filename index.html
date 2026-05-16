@@ -69,7 +69,6 @@
             addMemberRow('阿明'); addMemberRow('阿華');
         };
 
-        // 頁籤切換
         function switchTab(tab) {
             if(tab === 'calc') {
                 document.getElementById('page-calc').classList.remove('hidden');
@@ -84,7 +83,6 @@
             }
         }
 
-        // 新增名字與金額輸入格
         function addMemberRow(name = '') {
             memberCount++;
             const container = document.getElementById('membersContainer');
@@ -99,7 +97,6 @@
             container.appendChild(row);
         }
 
-        // 前端分攤計錢核心邏輯
         function calculateExpenses() {
             const discount = parseFloat(document.getElementById('discountFee').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryFee').value) || 0;
@@ -122,7 +119,6 @@
 
             members.forEach(m => {
                 const shareRatio = foodTotal > 0 ? (m.price / foodTotal) : 0;
-                
                 const individualShareFee = (totalExtraFee * shareRatio); 
                 const individualShareDiscount = (discount * shareRatio); 
                 
@@ -148,7 +144,6 @@
             document.getElementById('grandTotal').textContent = total.toFixed(1);
         }
 
-        // 確認並送出到 Sheet
         function triggerFinalConfirm() {
             const title = document.getElementById('mealTitle').value.trim() || "未命名食飯紀錄";
             if (calculatedData.length === 0) return alert('請先輸入成員與金額！');
@@ -165,7 +160,6 @@
             }
         }
 
-        // 讀取歷史並渲染
         function loadHistory() {
             const listDiv = document.getElementById('historyList');
             listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
@@ -195,15 +189,23 @@
                         const disc = person.shareDiscount ? parseFloat(person.shareDiscount).toFixed(1) : '0.0';
                         const final = person.finalPrice ? parseFloat(person.finalPrice).toFixed(1) : '0.0';
 
-                        // 💡 狀態標籤變回可點擊的按鈕 <button>
+                        // 💡 判斷是否需要顯示時間戳記 (只有已付，且後端有記錄時間時才顯示)
+                        let timeLabelHTML = '';
+                        if (isPaid && person.updateTime && person.updateTime !== '-') {
+                            timeLabelHTML = `<div class="text-[9px] text-gray-400 text-right mt-0.5">(last update dtm: ${person.updateTime})</div>`;
+                        }
+
                         boxHTML += `<div class="flex justify-between items-center text-xs border-b border-dashed border-gray-200 py-1">
                             <div class="flex flex-col md:flex-row md:gap-1">
                                 <span class="font-semibold text-gray-800">${person.name}</span>
                                 <span class="text-gray-400 text-[11px]">(原價$${orig} + 雜$${fee} - 扣$${disc})</span>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <span class="font-bold text-indigo-600 text-sm">$${final}</span>
-                                <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge} transition">${person.status || '❌ 未付'}</button>
+                            <div class="flex flex-col items-end gap-0.5">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-bold text-indigo-600 text-sm">$${final}</span>
+                                    <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge} transition">${person.status || '❌ 未付'}</button>
+                                </div>
+                                ${timeLabelHTML}
                             </div>
                         </div>`;
                     });
@@ -215,19 +217,16 @@
             });
         }
 
-        // 🔒 更改狀態與密碼驗證函數
         function toggleStatus(id, name) {
             const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
-            
-            if (password === null) return; // 使用者按了取消
+            if (password === null) return;
             
             if (password === "0000") {
-                // 密碼正確，向後端發送修改請求
                 fetch(GAS_URL, {
                     method: 'POST',
                     body: JSON.stringify({ action: 'updateStatus', id: id, name: name })
                 }).then(() => {
-                    loadHistory(); // 重新整理畫面
+                    loadHistory(); 
                 }).catch(err => alert('更新失敗: ' + err));
             } else {
                 alert("❌ 密碼錯誤！無法更改狀態。");
