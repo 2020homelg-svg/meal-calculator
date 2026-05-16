@@ -71,29 +71,39 @@
             loadHistory(); 
         };
 
-        // 🔒 修正後的權限檢查邏輯
+        // 🔒 將密碼送到後端驗證，前端完全不留密碼痕跡
         function tryAccessCalcTab() {
-            // 1. 先無條件切換畫面到「新增計算」分頁
             switchTab('calc');
-
-            // 2. 如果之前已經解鎖過，就直接停留在這裡，不需要再彈出 prompt
             if (isAdminUnlocked) return;
 
-            // 3. 使用 setTimeout 稍微延遲（100毫秒），確保瀏覽器已經渲染好「新增計算」的畫面後，才彈出輸入框
             setTimeout(() => {
                 const password = prompt("已進入【新增計算】介面，請輸入管理員密碼完成解鎖：");
-                
-                if (password === "0000") {
-                    isAdminUnlocked = true; // 密碼正確，標記為已解鎖
-                } else {
-                    // 密碼錯誤或按了取消，強制將畫面彈回「歷史紀錄」
-                    alert("❌ 密碼錯誤或取消！將強制返回歷史紀錄。");
-                    switchTab('history'); 
+                if (password === null) {
+                    switchTab('history');
+                    return;
                 }
+
+                // 發送請求給 GAS 後端驗證密碼
+                fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'checkPassword', password: password })
+                })
+                .then(res => res.json())
+                .then(resData => {
+                    if (resData.status === "success") {
+                        isAdminUnlocked = true; 
+                    } else {
+                        alert("❌ 密碼錯誤！將強制返回歷史紀錄。");
+                        switchTab('history');
+                    }
+                })
+                .catch(err => {
+                    alert("連線錯誤: " + err);
+                    switchTab('history');
+                });
             }, 100);
         }
 
-        // 頁籤切換渲染
         function switchTab(tab) {
             if(tab === 'calc') {
                 document.getElementById('page-calc').classList.remove('hidden');
@@ -109,7 +119,6 @@
             }
         }
 
-        // 新增名字與金額輸入格
         function addMemberRow(name = '') {
             memberCount++;
             const container = document.getElementById('membersContainer');
@@ -124,7 +133,6 @@
             container.appendChild(row);
         }
 
-        // 前端分攤計錢核心邏輯
         function calculateExpenses() {
             const discount = parseFloat(document.getElementById('discountFee').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryFee').value) || 0;
@@ -172,7 +180,6 @@
             document.getElementById('grandTotal').textContent = total.toFixed(1);
         }
 
-        // 確認並送出到 Sheet
         function triggerFinalConfirm() {
             const title = document.getElementById('mealTitle').value.trim() || "未命名食飯紀錄";
             if (calculatedData.length === 0) return alert('請先輸入成員與金額！');
@@ -188,13 +195,12 @@
             }
         }
 
-        // 讀取歷史並渲染
         function loadHistory() {
             const listDiv = document.getElementById('historyList');
             listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
             
             fetch(GAS_URL).then(res => res.json()).then(data => {
-                if(data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
+                if(!data || data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
                 
                 const groups = {};
                 data.forEach(item => {
@@ -245,21 +251,24 @@
             });
         }
 
-        // 更改狀態與密碼驗證
+        // 🔒 修改狀態：同樣將密碼送至後端安全驗證
         function toggleStatus(id, name) {
             const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
             if (password === null) return;
             
-            if (password === "0000") {
-                fetch(GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'updateStatus', id: id, name: name })
-                }).then(() => {
+            fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'updateStatus', id: id, name: name, password: password })
+            })
+            .then(res => res.json())
+            .then(resData => {
+                if (resData.status === "success") {
                     loadHistory(); 
-                }).catch(err => alert('更新失敗: ' + err));
-            } else {
-                alert("❌ 密碼錯誤！無法更改狀態。");
-            }
+                } else {
+                    alert("❌ 密碼錯誤！無法更改狀態。");
+                }
+            })
+            .catch(err => alert('更新失敗: ' + err));
         }
     </script>
 </body>
