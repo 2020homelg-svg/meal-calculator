@@ -12,10 +12,10 @@
         <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
             <div>
                 <h1 class="text-xl font-black tracking-wide">🍽️ 食飯分賬計錢神器 Pro</h1>
-                <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器.</p>
+                <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器</p>
             </div>
             <span class="bg-indigo-500 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
-                v6.3
+                v6.4
             </span>
         </div>
 
@@ -81,11 +81,9 @@
     </div>
 
     <script>
-        // 🔒
-        // const OBFUSCATED_URL = "YUhSMGNEb3ZMMU5qY21sd2RDNW5iMjlzYkdVdVkyOXRMMTF0WVdOeWIzTXZjM3RmVkdOWVkySmtURWxOVmtaVldYZDVNMmh3UjFkTk1XSm5lMmxNWU10cmQwRjJlV015V1daNFFXbEtiMWRUVTBWVmJsZE1ZbmF2YlhZMWQwVnlYM0J2Ylc5dUxYUnlaMDFuTTA5R2FYWklSMmN2Zg0PQ==";
-        // 🛠️ 
-        //const GAS_URL = atob(atob(OBFUSCATED_URL));
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec";
+        const OBFUSCATED_URL = "YUhSMGNEb3ZMMU5qY21sd2RDNW5iMjlzYkdVdVkyOXRMMTF0WVdOeWIzTXZjM3RmVkdOWVkySmtURWxOVmtaVldYZDVNMmh3UjFkTk1XSm5lMmxNWU10cmQwRjJlV015V1daNFFXbEtiMWRUVTBWVmJsZE1ZbmF2YlhZMWQwVnlYM0J2Ylc5dUxYUnlaMDFuTTA5R2FYWklSMmN2Zg0PQ=="; 
+        const GAS_URL = atob(atob(OBFUSCATED_URL)); 
+
         let memberCount = 0;
         let calculatedData = [];
         let isAdminUnlocked = false; 
@@ -202,13 +200,11 @@
             document.getElementById('grandTotal').textContent = total.toFixed(1);
         }
 
-        // 💡 已修改：動態組合三個輸入框的內容傳給 Google Sheet
         function triggerFinalConfirm() {
             const platform = document.getElementById('platform').value.trim();
             const orderNo = document.getElementById('orderNo').value.trim();
             const restaurant = document.getElementById('restaurant').value.trim();
             
-            // 如果三個都沒填，給予預設值；若有填，則組合成 [外賣平台][單號][餐廳名稱]
             let finalTitle = "";
             if (!platform && !orderNo && !restaurant) {
                 finalTitle = "未命名食飯紀錄";
@@ -224,7 +220,6 @@
                     body: JSON.stringify({ action: 'addRecord', title: finalTitle, data: calculatedData })
                 }).then(() => {
                     alert('✅ 紀錄成功寫入 Google Sheet！');
-                    // 成功送出後清空輸入框
                     document.getElementById('platform').value = "";
                     document.getElementById('orderNo').value = "";
                     document.getElementById('restaurant').value = "";
@@ -275,8 +270,39 @@
                             <div class="flex flex-col items-end gap-0.5">
                                 <div class="flex items-center gap-3">
                                     <span class="font-bold text-indigo-600 text-sm">$${final}</span>
-                                    <button onclick="toggleStatus('${id
-                                                                     
-                                                                     
-                                                                     
-                                                                
+                                    <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge} transition">${person.status || '❌ 未付'}</button>
+                                </div>
+                                ${timeLabelHTML}
+                            </div>
+                        </div>`;
+                    });
+                    boxHTML += `</div></div>`;
+                    listDiv.innerHTML += boxHTML;
+                });
+            }).catch(err => {
+                // 🛠️ 這裡的括號與語法錯誤已經完美修復！
+                listDiv.innerHTML = `<p class="text-center text-red-500">載入失敗 (${err})</p>`;
+            });
+        }
+
+        function toggleStatus(id, name) {
+            const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
+            if (password === null) return;
+            
+            fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'updateStatus', id: id, name: name, password: password })
+            })
+            .then(res => res.json())
+            .then(resData => {
+                if (resData.status === "success") {
+                    loadHistory(); 
+                } else {
+                    alert("❌ 密碼錯誤！無法更改狀態。");
+                }
+            })
+            .catch(err => alert('更新失敗: ' + err));
+        }
+    </script>
+</body>
+</html>
