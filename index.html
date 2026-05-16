@@ -9,12 +9,22 @@
 <body class="bg-gray-100 min-h-screen p-4">
     <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         
-        <div class="flex border-b bg-gray-50">
-            <button onclick="switchTab('calc')" id="tab-calc" class="flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600">🍽️ 新增計算</button>
-            <button onclick="switchTab('history'); loadHistory();" id="tab-history" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">📊 查看歷史紀錄</button>
+        <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+            <div>
+                <h1 class="text-xl font-black tracking-wide">🍽️ 食飯分賬計錢神器 Pro</h1>
+                <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器</p>
+            </div>
+            <span class="bg-indigo-500 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
+                v6.0
+            </span>
         </div>
 
-        <div id="page-calc" class="p-6">
+        <div class="flex border-b bg-gray-50">
+            <button onclick="tryAccessCalcTab()" id="tab-calc" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">🍽️ 新增計算 (Admin)</button>
+            <button onclick="switchTab('history')" id="tab-history" class="flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600">📊 查看歷史紀錄</button>
+        </div>
+
+        <div id="page-calc" class="p-6 hidden">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700">開餐主題 / 餐廳名稱</label>
                 <input type="text" id="mealTitle" placeholder="例如：Deliveroo 麥當勞" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
@@ -50,7 +60,7 @@
             </div>
         </div>
 
-        <div id="page-history" class="p-6 hidden">
+        <div id="page-history" class="p-6">
             <h2 class="text-lg font-bold mb-2 text-gray-800">📋 歷史開支明細</h2>
             <p class="text-xs text-gray-500 mb-4">提示：點擊右側的付款狀態按鈕即可切換狀態（需管理員密碼）。</p>
             <div id="historyList" class="space-y-4">
@@ -60,29 +70,60 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec"; 
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwT_echcwcPGxQqvTil55qpYyXKcuIBpgpp0RobSrMmpa2L-LnqTEh3CT4BA_OgUtCAgQ/exec"; 
 
         let memberCount = 0;
         let calculatedData = [];
+        let isAdminUnlocked = false; 
 
         window.onload = function() {
-            addMemberRow('Roy'); 
-            addMemberRow('Yeki');
-            addMemberRow('Kermit'); 
-            addMemberRow('Ben');
+            addMemberRow('阿明'); addMemberRow('阿華');
+            loadHistory(); 
         };
 
+        function tryAccessCalcTab() {
+            switchTab('calc');
+            if (isAdminUnlocked) return;
+
+            setTimeout(() => {
+                const password = prompt("已進入【新增計算】介面，請輸入管理員密碼完成解鎖：");
+                if (password === null) {
+                    switchTab('history');
+                    return;
+                }
+
+                fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'checkPassword', password: password })
+                })
+                .then(res => res.json())
+                .then(resData => {
+                    if (resData.status === "success") {
+                        isAdminUnlocked = true; 
+                    } else {
+                        alert("❌ 密碼錯誤！將強制返回歷史紀錄。");
+                        switchTab('history');
+                    }
+                })
+                .catch(err => {
+                    alert("連線錯誤: " + err);
+                    switchTab('history');
+                });
+            }, 100);
+        }
+
         function switchTab(tab) {
-            if(tab === 'calc') { 
+            if(tab === 'calc') {
                 document.getElementById('page-calc').classList.remove('hidden');
                 document.getElementById('page-history').classList.add('hidden');
                 document.getElementById('tab-calc').className = "flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600";
                 document.getElementById('tab-history').className = "flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600";
-            } else { 
+            } else {
                 document.getElementById('page-calc').classList.add('hidden');
                 document.getElementById('page-history').classList.remove('hidden');
                 document.getElementById('tab-history').className = "flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600";
                 document.getElementById('tab-calc').className = "flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600";
+                loadHistory(); 
             }
         }
 
@@ -100,6 +141,7 @@
             container.appendChild(row);
         }
 
+        // 前端分攤計錢核心邏輯
         function calculateExpenses() {
             const discount = parseFloat(document.getElementById('discountFee').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryFee').value) || 0;
@@ -158,7 +200,6 @@
                 }).then(() => {
                     alert('✅ 紀錄成功寫入 Google Sheet！');
                     switchTab('history');
-                    loadHistory();
                 }).catch(err => alert('錯誤: ' + err));
             }
         }
@@ -168,7 +209,7 @@
             listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
             
             fetch(GAS_URL).then(res => res.json()).then(data => {
-                if(data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
+                if(!data || data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
                 
                 const groups = {};
                 data.forEach(item => {
@@ -192,7 +233,6 @@
                         const disc = person.shareDiscount ? parseFloat(person.shareDiscount).toFixed(1) : '0.0';
                         const final = person.finalPrice ? parseFloat(person.finalPrice).toFixed(1) : '0.0';
 
-                        // 💡 判斷是否需要顯示時間戳記 (只有已付，且後端有記錄時間時才顯示)
                         let timeLabelHTML = '';
                         if (isPaid && person.updateTime && person.updateTime !== '-') {
                             timeLabelHTML = `<div class="text-[9px] text-gray-400 text-right mt-0.5">(last update dtm: ${person.updateTime})</div>`;
@@ -224,16 +264,19 @@
             const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
             if (password === null) return;
             
-            if (password === "0000") {
-                fetch(GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'updateStatus', id: id, name: name })
-                }).then(() => {
+            fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'updateStatus', id: id, name: name, password: password })
+            })
+            .then(res => res.json())
+            .then(resData => {
+                if (resData.status === "success") {
                     loadHistory(); 
-                }).catch(err => alert('更新失敗: ' + err));
-            } else {
-                alert("❌ 密碼錯誤！無法更改狀態。");
-            }
+                } else {
+                    alert("❌ 密碼錯誤！無法更改狀態。");
+                }
+            })
+            .catch(err => alert('更新失敗: ' + err));
         }
     </script>
 </body>
