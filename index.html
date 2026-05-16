@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>食飯對數總管 Pro</title>
+    <title>食飯分賬計錢神器</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
@@ -12,21 +12,21 @@
         <!-- 頂部頁籤切換 -->
         <div class="flex border-b bg-gray-50">
             <button onclick="switchTab('calc')" id="tab-calc" class="flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600">🍽️ 新增計算</button>
-            <button onclick="switchTab('history'); loadHistory();" id="tab-history" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">📊 歷史對數板塊</button>
+            <button onclick="switchTab('history'); loadHistory();" id="tab-history" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">📊 查看歷史紀錄</button>
         </div>
 
         <!-- 分頁 1：計算開支 -->
         <div id="page-calc" class="p-6">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700">開餐主題/餐廳名稱</label>
-                <input type="text" id="mealTitle" placeholder="例如：Deliveroo 麥當勞 / 星期五茶記" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                <label class="block text-sm font-medium text-gray-700">開餐主題 / 餐廳名稱</label>
+                <input type="text" id="mealTitle" placeholder="例如：Deliveroo 麥當勞" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
             </div>
             
-            <!-- 費用與折扣輸入區域 -->
+            <!-- 雜費與折扣分開輸入 -->
             <div class="grid grid-cols-3 gap-4 mb-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 text-red-600">總折扣 / 減價 ($)</label>
-                    <input type="number" id="discountFee" value="0" min="0" placeholder="縮減金額" class="mt-1 block w-full rounded-md border-red-300 shadow-sm border p-2 bg-red-50 text-red-700 font-bold" oninput="calculateExpenses()">
+                    <input type="number" id="discountFee" value="0" min="0" class="mt-1 block w-full rounded-md border-red-300 shadow-sm border p-2 bg-red-50 text-red-700 font-bold" oninput="calculateExpenses()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">總運費 ($)</label>
@@ -46,17 +46,17 @@
             </div>
             
             <div class="mt-6 border-t pt-4">
-                <h3 class="font-bold text-gray-700 mb-2">核算結果 (自動扣減折扣 + 比例分攤雜費)：</h3>
+                <h3 class="font-bold text-gray-700 mb-2">核算明細 (按原價比例分攤)：</h3>
                 <div id="calcResults" class="space-y-1 text-sm text-gray-600 mb-4"></div>
                 <div class="text-right text-lg font-bold text-gray-800 mb-4">整單最終總計: $<span id="grandTotal">0.0</span></div>
                 <button onclick="triggerFinalConfirm()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow">🚀 檢查並確認紀錄 (Final Confirm)</button>
             </div>
         </div>
 
-        <!-- 分頁 2：歷史對數 -->
+        <!-- 分頁 2：歷史紀錄（唯讀，對數去 Google Sheet 改） -->
         <div id="page-history" class="p-6 hidden">
-            <h2 class="text-lg font-bold mb-4 text-gray-800">💰 收錢狀態追蹤</h2>
-            <p class="text-xs text-gray-500 mb-4">提示：點擊任何成員的「狀態按鈕」更改狀態（需管理員密碼）。</p>
+            <h2 class="text-lg font-bold mb-2 text-gray-800">📋 歷史開支明細</h2>
+            <p class="text-xs text-gray-500 mb-4">提示：如需修改「❌ 未付」狀態，請直接打開你的 Google Sheet 進行勾選對數。</p>
             <div id="historyList" class="space-y-4">
                 <p class="text-center text-gray-500">載入中...</p>
             </div>
@@ -64,7 +64,6 @@
     </div>
 
     <script>
-        // 🔗 已成功綁定你的 Google Apps Script 網頁應用程式 URL
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwT_echcwcPGxQqvTil55qpYyXKcuIBpgpp0RobSrMmpa2L-LnqTEh3CT4BA_OgUtCAgQ/exec"; 
 
         let memberCount = 0;
@@ -107,7 +106,7 @@
             const delivery = parseFloat(document.getElementById('deliveryFee').value) || 0;
             const other = parseFloat(document.getElementById('otherFee').value) || 0;
             
-            const netExtraFee = delivery + other - discount;
+            const totalExtraFee = delivery + other; 
             const rows = document.querySelectorAll('.member-row');
             let foodTotal = 0; let members = [];
 
@@ -124,15 +123,26 @@
 
             members.forEach(m => {
                 const shareRatio = foodTotal > 0 ? (m.price / foodTotal) : 0;
-                let finalPay = m.price + (netExtraFee * shareRatio);
+                
+                const individualShareFee = (totalExtraFee * shareRatio); 
+                const individualShareDiscount = (discount * shareRatio); 
+                
+                let finalPay = m.price + individualShareFee - individualShareDiscount;
                 if (finalPay < 0) finalPay = 0;
 
                 total += finalPay;
-                calculatedData.push({ name: m.name, price: finalPay.toFixed(1) });
+                
+                calculatedData.push({ 
+                    name: m.name, 
+                    originalPrice: m.price.toFixed(1),
+                    shareFee: individualShareFee.toFixed(1),
+                    shareDiscount: individualShareDiscount.toFixed(1),
+                    finalPrice: finalPay.toFixed(1)
+                });
                 
                 resultsDiv.innerHTML += `
-                    <div class="flex justify-between border-b border-gray-100 py-1">
-                        <span>${m.name} <span class="text-xs text-gray-400">(原價$${m.price})</span></span>
+                    <div class="flex justify-between border-b border-gray-100 py-1 text-xs">
+                        <span>${m.name} <span class="text-gray-400">(原價$${m.price} + 雜$${individualShareFee.toFixed(1)} - 扣$${individualShareDiscount.toFixed(1)})</span></span>
                         <span class="font-bold text-indigo-600">$${finalPay.toFixed(1)}</span>
                     </div>`;
             });
@@ -143,12 +153,12 @@
             const title = document.getElementById('mealTitle').value.trim() || "未命名食飯紀錄";
             if (calculatedData.length === 0) return alert('請先輸入成員與金額！');
             
-            if (confirm(`【最後核對確認】\n項目：${title}\n總金額：$${document.getElementById('grandTotal').textContent}\n資料將儲存至 Google Sheet，成員狀態預設為 ❌ 未付。`)) {
+            if (confirm(`【最後核對】\n項目：${title}\n總金額：$${document.getElementById('grandTotal').textContent}\n資料將傳送至 Google Sheet，狀態預設為 ❌ 未付。`)) {
                 fetch(GAS_URL, {
                     method: 'POST',
                     body: JSON.stringify({ action: 'addRecord', title: title, data: calculatedData })
                 }).then(() => {
-                    alert('✅ 紀錄成功寫入！');
+                    alert('✅ 紀錄成功寫入 Google Sheet！');
                     switchTab('history');
                     loadHistory();
                 }).catch(err => alert('錯誤: ' + err));
@@ -157,7 +167,7 @@
 
         function loadHistory() {
             const listDiv = document.getElementById('historyList');
-            listDiv.innerHTML = '<p class="text-center text-gray-500">正在同步 Google Sheet 資料...</p>';
+            listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
             
             fetch(GAS_URL).then(res => res.json()).then(data => {
                 if(data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
@@ -176,35 +186,19 @@
                         <div class="space-y-2">`;
                     
                     group.items.forEach(person => {
-                        const btnColor = person.status.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                        const isPaid = person.status.includes('✅');
+                        const statusBadge = isPaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
                         boxHTML += `<div class="flex justify-between items-center text-sm">
-                            <span>${person.name}: <b class="text-gray-800">$${person.price}</b></span>
-                            <button onclick="toggleStatus('${id}', '${person.name}')" class="px-3 py-1 text-xs font-semibold rounded-full ${btnColor} transition">${person.status}</button>
+                            <span>${person.name}: <b class="text-gray-800">$${person.finalPrice}</b></span>
+                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge}">${person.status}</span>
                         </div>`;
                     });
                     boxHTML += `</div></div>`;
                     listDiv.innerHTML += boxHTML;
                 });
             }).catch(err => {
-                listDiv.innerHTML = `<p class="text-center text-red-500">載入失敗，請確認 GAS 權限是否設為 Anyone。(${err})</p>`;
+                listDiv.innerHTML = `<p class="text-center text-red-500">載入失敗 (${err})</p>`;
             });
-        }
-
-        function toggleStatus(id, name) {
-            const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
-            
-            if (password === null) return; 
-            
-            if (password === "0000") {
-                fetch(GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'updateStatus', id: id, name: name })
-                }).then(() => {
-                    loadHistory(); 
-                });
-            } else {
-                alert("❌ 密碼錯誤！無法更改狀態。");
-            }
         }
     </script>
 </body>
