@@ -64,29 +64,33 @@
 
         let memberCount = 0;
         let calculatedData = [];
-        let isAdminUnlocked = false; // 💡 用來記錄管理員是否已經解鎖過「新增計算」
+        let isAdminUnlocked = false; 
 
         window.onload = function() {
             addMemberRow('阿明'); addMemberRow('阿華');
-            loadHistory(); // 💡 網頁一打開，預設加載歷史紀錄
+            loadHistory(); 
         };
 
-        // 🔒 檢查是否有權限進入「新增計算」
+        // 🔒 修正後的權限檢查邏輯
         function tryAccessCalcTab() {
-            if (isAdminUnlocked) {
-                // 如果之前已經輸入過密碼解鎖了，直接切換
-                switchTab('calc');
-                return;
-            }
+            // 1. 先無條件切換畫面到「新增計算」分頁
+            switchTab('calc');
 
-            const password = prompt("進入【新增計算】需要管理員密碼：");
-            if (password === "0000") {
-                isAdminUnlocked = true; // 標記為已解鎖
-                switchTab('calc');
-            } else if (password !== null) {
-                alert("❌ 密碼錯誤！無法進入管理員模式。");
-                switchTab('history'); // 強制彈回歷史紀錄
-            }
+            // 2. 如果之前已經解鎖過，就直接停留在這裡，不需要再彈出 prompt
+            if (isAdminUnlocked) return;
+
+            // 3. 使用 setTimeout 稍微延遲（100毫秒），確保瀏覽器已經渲染好「新增計算」的畫面後，才彈出輸入框
+            setTimeout(() => {
+                const password = prompt("已進入【新增計算】介面，請輸入管理員密碼完成解鎖：");
+                
+                if (password === "0000") {
+                    isAdminUnlocked = true; // 密碼正確，標記為已解鎖
+                } else {
+                    // 密碼錯誤或按了取消，強制將畫面彈回「歷史紀錄」
+                    alert("❌ 密碼錯誤或取消！將強制返回歷史紀錄。");
+                    switchTab('history'); 
+                }
+            }, 100);
         }
 
         // 頁籤切換渲染
@@ -101,7 +105,7 @@
                 document.getElementById('page-history').classList.remove('hidden');
                 document.getElementById('tab-history').className = "flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600";
                 document.getElementById('tab-calc').className = "flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600";
-                loadHistory(); // 切換回歷史分頁時順便刷新數據
+                loadHistory(); 
             }
         }
 
@@ -237,7 +241,7 @@
                     listDiv.innerHTML += boxHTML;
                 });
             }).catch(err => {
-                listDiv.innerHTML = `<p class="text-center text-red-500">載入失敗 (${err})</p>';
+                listDiv.innerHTML = `<p class="text-center text-red-500">載入失敗 (${err})</p>`;
             });
         }
 
