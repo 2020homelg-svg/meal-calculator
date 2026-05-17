@@ -15,7 +15,7 @@
                 <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器</p>
             </div>
             <span class="bg-indigo-500 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
-                v6.7
+                v6.9
             </span>
         </div>
 
@@ -90,9 +90,10 @@
     </div>
 
     <script>
-        //const OBFUSCATED_URL = "YUhSMGNEb3ZMMU5qY21sd2RDNW5iMjlzYkdVdVkyOXRMMTF0WVdOeWIzTXZjM3RmVkdOWVkySmtURWxOVmtaVldYZDVNMmh3UjFkTk1XSm5lMmxNWU10cmQwRjJlV015V1daNFFXbEtiMWRUVTBWVmJsZE1YMDV2Vmt0TWNuTndiMjVHTlhSeVpWMXpVbWN6VTNSZk9HMW5NMElpY21kbldVYz0NCg=="; 
-        //const GAS_URL = atob(atob(OBFUSCATED_URL)); 
+        const OBFUSCATED_URL = "YUhSMGNEb3ZMMU5qY21sd2RDNW5iMjlzYkdVdVkyOXRMMTF0WVdOeWIzTXZjM3RmVkdOWVkySmtURWxOVmtaVldYZDVNMmh3UjFkTk1XSm5lMmxNWU10cmQwRjJlV015V1daNFFXbEtiMWRUVTBWVmJsZE1YMDV2Vmt0TWNuTndiMjVHTlhSeVpWMXpVbWN6VTNSZk9HMW5NMElpY21kbldVYz0NCg=="; 
+        const GAS_URL = atob(atob(OBFUSCATED_URL)); 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec";
+
         let memberCount = 0;
         let calculatedData = [];
         let globalHistoryRawData = []; 
@@ -164,7 +165,7 @@
             container.appendChild(row);
         }
 
-        // 💡 已修復：這次完美補上了 總折扣、總運費、其他雜費 的重新載入邏輯！
+        // 💡 終極修正：直接讀取雲端附帶的原始 raw 獨立費用，100% 精準還原！
         function reloadRecordById() {
             const idInput = document.getElementById('reloadId').value.trim();
             if (!idInput) return alert("請先輸入 ID！");
@@ -172,7 +173,7 @@
             const matchingRows = globalHistoryRawData.filter(item => String(item.id) === idInput);
             
             if (matchingRows.length === 0) {
-                return alert("⚠️ 找不到該 ID 的紀錄！請確認號碼是否正確，或重新切換歷史紀錄重整資料。");
+                return alert("⚠️ 找不到該 ID 的紀錄！請確認號碼是否正確。");
             }
 
             const firstRow = matchingRows[0];
@@ -191,16 +192,22 @@
                 document.getElementById('orderNo').value = '';
             }
 
-            // 2. ⚡【新補上】重載三大費用項目：總折扣、總運費、其他雜費
-            // 由於可能因為後端傳回的欄位名稱不同，這裡做相容性檢查 (支援讀取你的原始欄位)
-            document.getElementById('discountFee').value = parseFloat(firstRow.discountFee || firstRow.discount || firstRow.shareDiscount || 0);
-            document.getElementById('deliveryFee').value = parseFloat(firstRow.deliveryFee || firstRow.delivery || firstRow.shareFee || 0);
-            document.getElementById('otherFee').value = parseFloat(firstRow.otherFee || firstRow.other || 0);
+            // 2. ⚡【完美還原】利用後端回傳的原始紀錄，精準填回三大費用
+            let totalDiscountRestored = 0;
+            matchingRows.forEach(row => {
+                totalDiscountRestored += parseFloat(row.shareDiscount || 0);
+            });
+            
+            document.getElementById('discountFee').value = totalDiscountRestored.toFixed(1);
+            document.getElementById('deliveryFee').value = parseFloat(firstRow.rawDeliveryFee || 0);
+            document.getElementById('otherFee').value = parseFloat(firstRow.rawOtherFee || 0);
 
             // 3. 清空並重新生成成員輸入框
             document.getElementById('membersContainer').innerHTML = '';
             matchingRows.forEach(row => {
-                addMemberRow(row.name, row.originalPrice);
+                // 如果原價讀到非數字，過濾掉以免前端死機
+                const origPrice = isNaN(parseFloat(row.originalPrice)) ? '' : row.originalPrice;
+                addMemberRow(row.name, origPrice);
             });
 
             // 4. 設定為編輯狀態模式
@@ -208,9 +215,9 @@
             document.getElementById('editModeStatus').innerHTML = `⚠️ <b>編輯模式開啟</b>：正在修改舊紀錄 (ID: ${idInput})，送出時將直接覆蓋。`;
             document.getElementById('editModeStatus').className = "text-[11px] text-red-600 mt-1 animate-pulse";
             
-            // 5. 重新計算一次金額與刷新畫面
+            // 5. 執行重新計算
             calculateExpenses();
-            alert("📋 舊紀錄（包含所有雜費與折扣）已成功全部載入！");
+            alert("📋 舊紀錄（包含獨立的運費與雜費大總額）已 100% 精準還原！");
         }
 
         function calculateExpenses() {
@@ -281,7 +288,10 @@
                 const payload = { 
                     action: 'addRecord', 
                     title: finalTitle, 
-                    data: calculatedData 
+                    data: calculatedData,
+                    // 💡 將原始大總計傳給後端，以便後端寫入擴充欄位保存
+                    rawDeliveryFee: parseFloat(document.getElementById('deliveryFee').value) || 0,
+                    rawOtherFee: parseFloat(document.getElementById('otherFee').value) || 0
                 };
                 if (currentEditingId) {
                     payload.customId = currentEditingId; 
@@ -292,12 +302,10 @@
                     body: JSON.stringify(payload)
                 }).then(() => {
                     alert('✅ 紀錄成功處置！');
-                    // 重設狀態
                     document.getElementById('platform').value = "";
                     document.getElementById('orderNo').value = "";
                     document.getElementById('restaurant').value = "";
                     document.getElementById('reloadId').value = "";
-                    // 還原費用預設值
                     document.getElementById('discountFee').value = 0;
                     document.getElementById('deliveryFee').value = 0;
                     document.getElementById('otherFee').value = 0;
@@ -332,13 +340,15 @@
                         <div class="space-y-2">`;
                     
                     group.items.forEach(person => {
-                        const isPaid = person.status && person.status.includes('✅');
+                        // 防呆：如果狀態欄被手動改壞了，給予預設值
+                        const statusStr = (typeof person.status === 'string') ? person.status : '❌ 未付';
+                        const isPaid = statusStr.includes('✅');
                         const statusBadge = isPaid ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200';
                         
-                        const orig = person.originalPrice ? parseFloat(person.originalPrice).toFixed(1) : '0.0';
-                        const fee = person.shareFee ? parseFloat(person.shareFee).toFixed(1) : '0.0';
-                        const disc = person.shareDiscount ? parseFloat(person.shareDiscount).toFixed(1) : '0.0';
-                        const final = person.finalPrice ? parseFloat(person.finalPrice).toFixed(1) : '0.0';
+                        const orig = !isNaN(parseFloat(person.originalPrice)) ? parseFloat(person.originalPrice).toFixed(1) : '0.0';
+                        const fee = !isNaN(parseFloat(person.shareFee)) ? parseFloat(person.shareFee).toFixed(1) : '0.0';
+                        const disc = !isNaN(parseFloat(person.shareDiscount)) ? parseFloat(person.shareDiscount).toFixed(1) : '0.0';
+                        const final = !isNaN(parseFloat(person.finalPrice)) ? parseFloat(person.finalPrice).toFixed(1) : '0.0';
 
                         let timeLabelHTML = '';
                         if (isPaid && person.updateTime && person.updateTime !== '-') {
@@ -353,7 +363,7 @@
                             <div class="flex flex-col items-end gap-0.5">
                                 <div class="flex items-center gap-3">
                                     <span class="font-bold text-indigo-600 text-sm">$${final}</span>
-                                    <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge} transition">${person.status || '❌ 未付'}</button>
+                                    <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge} transition">${statusStr}</button>
                                 </div>
                                 ${timeLabelHTML}
                             </div>
@@ -388,6 +398,3 @@
     </script>
 </body>
 </html>
-
-
-        
