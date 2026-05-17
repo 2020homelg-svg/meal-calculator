@@ -15,7 +15,7 @@
                 <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器</p>
             </div>
             <span class="bg-indigo-500 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
-                v6.6
+                v6.7
             </span>
         </div>
 
@@ -93,11 +93,10 @@
         //const OBFUSCATED_URL = "YUhSMGNEb3ZMMU5qY21sd2RDNW5iMjlzYkdVdVkyOXRMMTF0WVdOeWIzTXZjM3RmVkdOWVkySmtURWxOVmtaVldYZDVNMmh3UjFkTk1XSm5lMmxNWU10cmQwRjJlV015V1daNFFXbEtiMWRUVTBWVmJsZE1YMDV2Vmt0TWNuTndiMjVHTlhSeVpWMXpVbWN6VTNSZk9HMW5NMElpY21kbldVYz0NCg=="; 
         //const GAS_URL = atob(atob(OBFUSCATED_URL)); 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec";
-        
         let memberCount = 0;
         let calculatedData = [];
-        let globalHistoryRawData = []; // 儲存從雲端抓下來的原始陣列，方便本機搜尋 ID
-        let currentEditingId = null;  // 記錄目前是不是在編輯狀態
+        let globalHistoryRawData = []; 
+        let currentEditingId = null;  
         let isAdminUnlocked = false; 
 
         window.onload = function() {
@@ -165,20 +164,21 @@
             container.appendChild(row);
         }
 
-        // 💡 新增功能：透過 ID 本地搜尋並反填表單
+        // 💡 已修復：這次完美補上了 總折扣、總運費、其他雜費 的重新載入邏輯！
         function reloadRecordById() {
             const idInput = document.getElementById('reloadId').value.trim();
             if (!idInput) return alert("請先輸入 ID！");
 
-            // 從全域變數篩選出符合該 ID 的所有成員列
             const matchingRows = globalHistoryRawData.filter(item => String(item.id) === idInput);
             
             if (matchingRows.length === 0) {
                 return alert("⚠️ 找不到該 ID 的紀錄！請確認號碼是否正確，或重新切換歷史紀錄重整資料。");
             }
 
+            const firstRow = matchingRows[0];
+
             // 1. 解析項目標題 [平台][單號][餐廳]
-            const title = matchingRows[0].title || "";
+            const title = firstRow.title || "";
             const matches = title.match(/\[(.*?)\]\[(.*?)\]\[(.*?)\]/);
             
             if (matches && matches.length >= 4) {
@@ -191,20 +191,26 @@
                 document.getElementById('orderNo').value = '';
             }
 
-            // 2. 清空並重新生成成員輸入框
+            // 2. ⚡【新補上】重載三大費用項目：總折扣、總運費、其他雜費
+            // 由於可能因為後端傳回的欄位名稱不同，這裡做相容性檢查 (支援讀取你的原始欄位)
+            document.getElementById('discountFee').value = parseFloat(firstRow.discountFee || firstRow.discount || firstRow.shareDiscount || 0);
+            document.getElementById('deliveryFee').value = parseFloat(firstRow.deliveryFee || firstRow.delivery || firstRow.shareFee || 0);
+            document.getElementById('otherFee').value = parseFloat(firstRow.otherFee || firstRow.other || 0);
+
+            // 3. 清空並重新生成成員輸入框
             document.getElementById('membersContainer').innerHTML = '';
             matchingRows.forEach(row => {
                 addMemberRow(row.name, row.originalPrice);
             });
 
-            // 3. 設定為編輯狀態模式
+            // 4. 設定為編輯狀態模式
             currentEditingId = idInput;
             document.getElementById('editModeStatus').innerHTML = `⚠️ <b>編輯模式開啟</b>：正在修改舊紀錄 (ID: ${idInput})，送出時將直接覆蓋。`;
             document.getElementById('editModeStatus').className = "text-[11px] text-red-600 mt-1 animate-pulse";
             
-            // 4. 重新計算一次金額
+            // 5. 重新計算一次金額與刷新畫面
             calculateExpenses();
-            alert("📋 舊紀錄已成功載入！您可以開始修改成員與金額。");
+            alert("📋 舊紀錄（包含所有雜費與折扣）已成功全部載入！");
         }
 
         function calculateExpenses() {
@@ -268,12 +274,10 @@
 
             if (calculatedData.length === 0) return alert('請先輸入成員與金額！');
             
-            // 💡 調整：如果是編輯模式，提示文字會改變
             const modeText = currentEditingId ? `【覆蓋舊紀錄模式】\n注意：這會重寫 ID: ${currentEditingId} 的資料。` : "【新增全新紀錄】";
 
             if (confirm(`${modeText}\n項目：${finalTitle}\n總金額：$${document.getElementById('grandTotal').textContent}\n資料將傳送至 Google Sheet，狀態預設為 ❌ 未付。`)) {
                 
-                // 傳送封包：如果 currentEditingId 有值，後端收到後可以直接依據此 ID 做覆蓋
                 const payload = { 
                     action: 'addRecord', 
                     title: finalTitle, 
@@ -293,6 +297,10 @@
                     document.getElementById('orderNo').value = "";
                     document.getElementById('restaurant').value = "";
                     document.getElementById('reloadId').value = "";
+                    // 還原費用預設值
+                    document.getElementById('discountFee').value = 0;
+                    document.getElementById('deliveryFee').value = 0;
+                    document.getElementById('otherFee').value = 0;
                     currentEditingId = null;
                     document.getElementById('editModeStatus').textContent = "目前模式：✨ 新增全新紀錄";
                     document.getElementById('editModeStatus').className = "text-[11px] text-gray-500 mt-1";
@@ -306,7 +314,7 @@
             listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
             
             fetch(GAS_URL).then(res => res.json()).then(data => {
-                globalHistoryRawData = data; // 💡 暫存至本地，重載 ID 時使用
+                globalHistoryRawData = data; 
                 
                 if(!data || data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
                 
@@ -380,3 +388,6 @@
     </script>
 </body>
 </html>
+
+
+        
