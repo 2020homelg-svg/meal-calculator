@@ -177,8 +177,7 @@
 
             members.forEach(m => {
                 const shareRatio = foodTotal > 0 ? (m.price / foodTotal) : 0;
-                //const individualShareFee = (totalExtraFee * shareRatio); 
-                const individualShareFee = (totalExtraFee / rows ); 
+                const individualShareFee = (totalExtraFee * shareRatio); 
                 const individualShareDiscount = (discount * shareRatio); 
                 
                 let finalPay = m.price + individualShareFee - individualShareDiscount;
