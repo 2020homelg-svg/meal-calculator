@@ -195,7 +195,7 @@
                 
                 resultsDiv.innerHTML += `
                     <div class="flex justify-between border-b border-gray-100 py-1 text-xs">
-                        <span>${m.name} <span class="text-gray-400">(原價$${m.price} + 雜$${individualShareFee.toFixed(1)} - 扣$${individualShareDiscount.toFixed(1)})</span></span>
+                        <span>${m.name}${rows} <span class="text-gray-400">(原價$${m.price} + 雜$${individualShareFee.toFixed(1)} - 扣$${individualShareDiscount.toFixed(1)})</span></span>
                         <span class="font-bold text-indigo-600">$${finalPay.toFixed(1)}</span>
                     </div>`;
             });
