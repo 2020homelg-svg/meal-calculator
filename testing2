@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食飯分賬計錢神器 Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        
+        <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+            <div>
+                <h1 class="text-xl font-black tracking-wide">🍽️ 食飯分賬計錢神器 Pro</h1>
+                <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器</p>
+            </div>
+            <span class="bg-indigo-500 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
+                v8.0
+            </span>
+        </div>
+
+        <div class="flex border-b bg-gray-50 text-xs sm:text-sm">
+            <button onclick="tryAccessCalcTab()" id="tab-calc" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">🍽️ 新增計算 (Admin)</button>
+            <button onclick="switchTab('history')" id="tab-history" class="flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600">📋 歷史明細</button>
+            <button onclick="switchTab('summary')" id="tab-summary" class="flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600">📊 總賬摘要 (Summary)</button>
+        </div>
+
+        <div id="page-calc" class="p-6 hidden">
+            <div class="mb-4 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                <label class="block text-xs font-bold text-indigo-700 mb-1">重載舊紀錄進行編輯 (選填)</label>
+                <div class="flex gap-2">
+                    <input type="text" id="reloadId" placeholder="請輸入 Google Sheet 中的 ID" class="flex-1 rounded-md border-indigo-200 shadow-sm border p-2 text-sm">
+                    <button onclick="reloadRecordById()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-md shadow transition">🔍 載入資料</button>
+                </div>
+                <p id="editModeStatus" class="text-[11px] text-gray-500 mt-1">目前模式：✨ 新增全新紀錄</p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">開餐基本資料</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <input type="text" id="platform" placeholder="外賣平台" class="block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm">
+                    </div>
+                    <div>
+                        <input type="text" id="orderNo" placeholder="單號" class="block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm">
+                    </div>
+                    <div>
+                        <input type="text" id="restaurant" placeholder="餐廳名稱" class="block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 text-red-600">總折扣 / 減價 ($)</label>
+                    <input type="number" id="discountFee" value="0" min="0" class="mt-1 block w-full rounded-md border-red-300 shadow-sm border p-2 bg-red-50 text-red-700 font-bold" oninput="calculateExpenses()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">總運費 ($)</label>
+                    <input type="number" id="deliveryFee" value="0" min="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" oninput="calculateExpenses()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">其他雜費 ($)</label>
+                    <input type="number" id="otherFee" value="0" min="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2" oninput="calculateExpenses()">
+                </div>
+            </div>
+            
+            <hr class="mb-6">
+            <div class="mb-6">
+                <h2 class="text-md font-semibold mb-3 text-gray-700">👥 成員與餐點原價</h2>
+                <div id="membersContainer" class="space-y-3"></div>
+                <button onclick="addMemberRow()" class="mt-3 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">➕ 新增成員</button>
+            </div>
+            
+            <div class="mt-6 border-t pt-4">
+                <h3 class="font-bold text-gray-700 mb-2">核算明細 (按原價比例分攤)：</h3>
+                <div id="calcResults" class="space-y-1 text-sm text-gray-600 mb-4"></div>
+                <div class="text-right text-lg font-bold text-gray-800 mb-4">整單最終總計: $<span id="grandTotal">0.0</span></div>
+                <button onclick="triggerFinalConfirm()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow">🚀 檢查並確認紀錄 (Final Confirm)</button>
+            </div>
+        </div>
+
+        <div id="page-history" class="p-6 hidden">
+            <h2 class="text-lg font-bold mb-2 text-gray-800">📋 歷史開支明細</h2>
+            <p class="text-xs text-gray-500 mb-4">提示：點擊右側的付款狀態按鈕即可切換狀態（需管理員密碼）。</p>
+            <div id="historyList" class="space-y-4">
+                <p class="text-center text-gray-500">載入中...</p>
+            </div>
+        </div>
+
+        <div id="page-summary" class="p-6">
+            <h2 class="text-lg font-bold mb-1 text-gray-800">📊 每個人的收款大總賬</h2>
+            <p class="text-xs text-gray-500 mb-4">自動跨越所有開單紀錄，加總統計每位成員的未付與已付總額。</p>
+            
+            <div class="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
+                <table class="min-w-full divide-y divide-gray-200 text-sm text-left">
+                    <thead class="bg-gray-100 font-bold text-gray-700">
+                        <tr>
+                            <th class="px-4 py-3">👤 名字</th>
+                            <th class="px-4 py-3 text-red-600">🚨 總欠款 (未付)</th>
+                            <th class="px-4 py-3 text-green-600">🎉 總已付</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody" class="divide-y divide-gray-200 text-gray-600">
+                        <tr>
+                            <td colspan="3" class="px-4 py-4 text-center text-gray-400">正在統計中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec";
+
+        let memberCount = 0;
+        let calculatedData = [];
+        let globalHistoryRawData = []; 
+        let currentEditingId = null;  
+        let isAdminUnlocked = false; 
+
+        window.onload = function() {
+            addMemberRow('阿明'); addMemberRow('阿華');
+            switchTab('summary'); // 預設進來直接看總賬，最直觀
+        };
+
+        function tryAccessCalcTab() {
+            switchTab('calc');
+            if (isAdminUnlocked) return;
+
+            setTimeout(() => {
+                const password = prompt("已進入【新增計算】介面，請輸入管理員密碼完成解鎖：");
+                if (password === null) {
+                    switchTab('summary');
+                    return;
+                }
+
+                if (password === "0000") {
+                    isAdminUnlocked = true;
+                    // 解鎖成功後重新加載
+                } else {
+                    alert("❌ 密碼錯誤！將強制返回總賬摘要。");
+                    switchTab('summary');
+                }
+            }, 100);
+        }
+
+        function switchTab(tab) {
+            document.getElementById('page-calc').classList.add('hidden');
+            document.getElementById('page-history').classList.add('hidden');
+            document.getElementById('page-summary').classList.add('hidden');
+            
+            document.getElementById('tab-calc').className = "flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600";
+            document.getElementById('tab-history').className = "flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600";
+            document.getElementById('tab-summary').className = "flex-1 py-3 text-center font-bold text-gray-500 hover:text-indigo-600";
+
+            if(tab === 'calc') {
+                document.getElementById('page-calc').classList.remove('hidden');
+                document.getElementById('tab-calc').className = "flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600";
+            } else if(tab === 'history') {
+                document.getElementById('page-history').classList.remove('hidden');
+                document.getElementById('tab-history').className = "flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600";
+                loadHistory();
+            } else if(tab === 'summary') {
+                document.getElementById('page-summary').classList.remove('hidden');
+                document.getElementById('tab-summary').className = "flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600";
+                loadDataAndRenderSummary();
+            }
+        }
+
+        function addMemberRow(name = '', price = '') {
+            memberCount++;
+            const container = document.getElementById('membersContainer');
+            const row = document.createElement('div');
+            row.className = 'flex gap-3 items-center member-row';
+            row.id = `row-${memberCount}`;
+            row.innerHTML = `
+                <input type="text" placeholder="名字" value="${name}" class="member-name flex-1 rounded-md border-gray-300 border p-2" oninput="calculateExpenses()">
+                <input type="number" placeholder="金額" value="${price}" class="member-price w-24 rounded-md border-gray-300 border p-2" oninput="calculateExpenses()">
+                <button onclick="document.getElementById('row-${memberCount}').remove(); calculateExpenses();" class="text-red-500 font-bold px-1">❌</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function reloadRecordById() {
+            const idInput = document.getElementById('reloadId').value.trim();
+            if (!idInput) return alert("請先輸入 ID！");
+            if (globalHistoryRawData.length === 0) return alert("⚠️ 請先點擊一次「歷史明細」頁面載入基礎資料，或重新整理。");
+
+            const matchingRows = globalHistoryRawData.filter(item => String(item.id) === idInput);
+            if (matchingRows.length === 0) return alert("⚠️ 找不到該 ID 的紀錄！");
+
+            const firstRow = matchingRows[0];
+            const title = firstRow.title || "";
+            const matches = title.match(/\[(.*?)\]\[(.*?)\]\[(.*?)\]/);
+            
+            if (matches && matches.length >= 4) {
+                document.getElementById('platform').value = matches[1] === '-' ? '' : matches[1];
+                document.getElementById('orderNo').value = matches[2] === '-' ? '' : matches[2];
+                document.getElementById('restaurant').value = matches[3] === '-' ? '' : matches[3];
+            } else {
+                document.getElementById('restaurant').value = title;
+                document.getElementById('platform').value = '';
+                document.getElementById('orderNo').value = '';
+            }
+
+            let totalDiscountRestored = 0;
+            let totalFeeRestored = 0;
+            matchingRows.forEach(row => {
+                totalDiscountRestored += parseFloat(row.shareDiscount) || 0;
+                totalFeeRestored += parseFloat(row.shareFee) || 0;
+            });
+
+            document.getElementById('discountFee').value = totalDiscountRestored > 0 ? totalDiscountRestored.toFixed(1) : 0;
+            if (firstRow.rawDeliveryFee !== undefined && parseFloat(firstRow.rawDeliveryFee) > 0) {
+                document.getElementById('deliveryFee').value = parseFloat(firstRow.rawDeliveryFee || 0);
+                document.getElementById('otherFee').value = parseFloat(firstRow.rawOtherFee || 0);
+            } else {
+                document.getElementById('deliveryFee').value = totalFeeRestored.toFixed(1);
+                document.getElementById('otherFee').value = 0;
+            }
+
+            document.getElementById('membersContainer').innerHTML = '';
+            matchingRows.forEach(row => {
+                addMemberRow(row.name, isNaN(parseFloat(row.originalPrice)) ? '' : row.originalPrice);
+            });
+
+            currentEditingId = String(idInput);
+            document.getElementById('editModeStatus').innerHTML = `⚠️ <b>編輯模式開啟</b>：正在修改舊紀錄 (ID: ${idInput})，送出時將直接覆蓋。`;
+            document.getElementById('editModeStatus').className = "text-[11px] text-red-600 mt-1 animate-pulse";
+            calculateExpenses();
+            alert("📋 歷史紀錄已成功載入！");
+        }
+
+        function calculateExpenses() {
+            const discount = parseFloat(document.getElementById('discountFee').value) || 0;
+            const delivery = parseFloat(document.getElementById('deliveryFee').value) || 0;
+            const other = parseFloat(document.getElementById('otherFee').value) || 0;
+            const totalExtraFee = delivery + other; 
+            const rows = document.querySelectorAll('.member-row');
+            let foodTotal = 0; let members = [];
+
+            rows.forEach(row => {
+                const name = row.querySelector('.member-name').value.trim();
+                const price = parseFloat(row.querySelector('.member-price').value) || 0;
+                if (name) { foodTotal += price; members.push({ name, price }); }
+            });
+
+            const resultsDiv = document.getElementById('calcResults');
+            resultsDiv.innerHTML = ''; calculatedData = []; let total = 0;
+
+            members.forEach(m => {
+                const shareRatio = foodTotal > 0 ? (m.price / foodTotal) : 0;
+                const individualShareFee = (totalExtraFee * shareRatio); 
+                const individualShareDiscount = (discount * shareRatio); 
+                let finalPay = m.price + individualShareFee - individualShareDiscount;
+                if (finalPay < 0) finalPay = 0;
+                total += finalPay;
+                
+                calculatedData.push({ 
+                    name: m.name, 
+                    originalPrice: m.price.toFixed(1), 
+                    shareFee: individualShareFee.toFixed(1), 
+                    shareDiscount: individualShareDiscount.toFixed(1), 
+                    finalPrice: finalPay.toFixed(1) 
+                });
+                
+                resultsDiv.innerHTML += `
+                    <div class="flex justify-between border-b border-gray-100 py-1 text-xs">
+                        <span>${m.name} <span class="text-gray-400">(原價$${m.price} + 雜$${individualShareFee.toFixed(1)} - 扣$${individualShareDiscount.toFixed(1)})</span></span>
+                        <span class="font-bold text-indigo-600">$${finalPay.toFixed(1)}</span>
+                    </div>`;
+            });
+            document.getElementById('grandTotal').textContent = total.toFixed(1);
+        }
+
+        function triggerFinalConfirm() {
+            const platform = document.getElementById('platform').value.trim();
+            const orderNo = document.getElementById('orderNo').value.trim();
+            const restaurant = document.getElementById('restaurant').value.trim();
+            let finalTitle = (!platform && !orderNo && !restaurant) ? "未命名食飯紀錄" : `[${platform || '-'}]` + `[${orderNo || '-'}]` + `[${restaurant || '-'}]`;
+
+            if (calculatedData.length === 0) return alert('請先輸入成員與金額！');
+            const hasActiveId = (currentEditingId !== null && currentEditingId !== undefined && currentEditingId !== "");
+            const modeText = hasActiveId ? `【覆蓋舊紀錄模式】\n注意：這會完全重寫並覆蓋 ID: ${currentEditingId} 的舊資料。` : "【新增全新紀錄】";
+
+            if (confirm(`${modeText}\n項目：${finalTitle}\n總金額：$${document.getElementById('grandTotal').textContent}`)) {
+                const payload = { 
+                    action: 'addRecord', title: finalTitle, data: calculatedData,
+                    rawDeliveryFee: parseFloat(document.getElementById('deliveryFee').value) || 0,
+                    rawOtherFee: parseFloat(document.getElementById('otherFee').value) || 0
+                };
+                if (hasActiveId) payload.customId = String(currentEditingId);
+
+                fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) }).then(() => {
+                    alert('✅ 紀錄處理完成！');
+                    document.getElementById('platform').value = ""; document.getElementById('orderNo').value = ""; document.getElementById('restaurant').value = "";
+                    document.getElementById('reloadId').value = ""; document.getElementById('discountFee').value = 0; document.getElementById('deliveryFee').value = 0; document.getElementById('otherFee').value = 0;
+                    currentEditingId = null;
+                    document.getElementById('editModeStatus').textContent = "目前模式：✨ 新增全新紀錄";
+                    document.getElementById('editModeStatus').className = "text-[11px] text-gray-500 mt-1";
+                    switchTab('summary');
+                }).catch(err => alert('錯誤: ' + err));
+            }
+        }
+
+        // 📊 核心新功能：非同步載入試算表資料並計算總大賬明細
+        function loadDataAndRenderSummary() {
+            const tbody = document.getElementById('summaryTableBody');
+            tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">正在即時加總試算表大數據...</td></tr>';
+            
+            fetch(GAS_URL).then(res => res.json()).then(data => {
+                globalHistoryRawData = data;
+                if(!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-400">目前沒有任何數據，請先建立新訂單。</td></tr>';
+                    return;
+                }
+
+                // 用來統計每個人的未付和已付金款
+                const userSummary = {};
+
+                data.forEach(item => {
+                    const name = item.name || "未知";
+                    const finalPrice = parseFloat(item.finalPrice) || 0;
+                    const isPaid = item.status && item.status.includes('✅');
+
+                    if (!userSummary[name]) {
+                        userSummary[name] = { unpaid: 0, paid: 0 };
+                    }
+
+                    if (isPaid) {
+                        userSummary[name].paid += finalPrice;
+                    } else {
+                        userSummary[name].unpaid += finalPrice;
+                    }
+                });
+
+                tbody.innerHTML = '';
+                Object.keys(userSummary).forEach(name => {
+                    const info = userSummary[name];
+                    const unpaidClass = info.unpaid > 0 ? "text-red-600 font-black" : "text-gray-400";
+                    
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-4 py-3 font-semibold text-gray-800">${name}</td>
+                            <td class="px-4 py-3 ${unpaidClass}">$${info.unpaid.toFixed(1)}</td>
+                            <td class="px-4 py-3 text-green-600 font-medium">$${info.paid.toFixed(1)}</td>
+                        </tr>
+                    `;
+                });
+            }).catch(err => {
+                tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-4 text-center text-red-500">連線錯誤: ${err}</td></tr>`;
+            });
+        }
+
+        function loadHistory() {
+            const listDiv = document.getElementById('historyList');
+            listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
+            
+            fetch(GAS_URL).then(res => res.json()).then(data => {
+                globalHistoryRawData = data; 
+                if(!data || data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
+                
+                const groups = {};
+                data.forEach(item => {
+                    if(!groups[item.id]) groups[item.id] = { title: item.title, date: item.date, items: [] };
+                    groups[item.id].items.push(item);
+                });
+
+                listDiv.innerHTML = '';
+                Object.keys(groups).reverse().forEach(id => {
+                    const group = groups[id];
+                    let boxHTML = `<div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-3">
+                        <div class="flex justify-between text-xs font-bold text-gray-500 mb-2"><span>📅 ${group.date}</span><span class="text-indigo-500 select-all">🆔 ${id}</span><span>🏷️ ${group.title}</span></div>
+                        <div class="space-y-2">`;
+                    
+                    group.items.forEach(person => {
+                        const statusStr = person.status || '❌ 未付';
+                        const isPaid = statusStr.includes('✅');
+                        const statusBadge = isPaid ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200';
+                        
+                        let timeLabelHTML = (isPaid && person.updateTime && person.updateTime !== '-') ? `<div class="text-[9px] text-gray-400 text-right mt-0.5">(last update dtm: ${person.updateTime})</div>` : '';
+
+                        boxHTML += `<div class="flex justify-between items-center text-xs border-b border-dashed border-gray-200 py-1">
+                            <div><span class="font-semibold text-gray-800">${person.name}</span> <span class="text-gray-400 text-[11px]">(原價$${person.originalPrice} + 雜$${person.shareFee} - 扣$${person.shareDiscount})</span></div>
+                            <div class="flex flex-col items-end">
+                                <div class="flex items-center gap-3"><span class="font-bold text-indigo-600 text-sm">$${person.finalPrice}</span>
+                                <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge}">${statusStr}</button></div>
+                                ${timeLabelHTML}
+                            </div>
+                        </div>`;
+                    });
+                    boxHTML += `</div></div>`;
+                    listDiv.innerHTML += boxHTML;
+                });
+            }).catch(err => { listDiv.innerHTML = `<p class="text-center text-red-500">連線錯誤: ${err}</p>`; });
+        }
+
+        function toggleStatus(id, name) {
+            const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
+            if (password === null) return;
+            fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'updateStatus', id: id, name: name, password: password }) })
+            .then(res => res.json()).then(resData => {
+                if (resData.status === "success") { loadHistory(); } else { alert("❌ 密碼錯誤！無法更改狀態。"); }
+            }).catch(err => alert('更新失敗: ' + err));
+        }
+    </script>
+</body>
+</html>
