@@ -15,7 +15,7 @@
                 <p class="text-xs text-indigo-200 mt-0.5">自動按比例分攤雜費與折扣的對賬利器</p>
             </div>
             <span class="bg-indigo-500 text-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full border border-indigo-400/30 shadow-inner">
-                v7.3
+                v7.5
             </span>
         </div>
 
@@ -90,13 +90,13 @@
     </div>
 
     <script>
-        //const OBFUSCATED_URL = "YUhSMGNEb3ZMMU5qY21sd2RDNW5iMjlzYkdVdVkyOXRMMTF0WVdOeWIzTXZjM3RmVkdOWVkySmtURWxOVmtaVldYZDVNMmh3UjFkTk1XSm5lMmxNWU10cmQwRjJlV015V1daNFFXbEtiMWRUVTBWVmJsZE1YMDV2Vmt0TWNuTndiMjVHTlhSeVpWMXpVbWN6VTNSZk9HMW5NMElpY21kbldVYz0NCg=="; 
-        //const GAS_URL = atob(atob(OBFUSCATED_URL)); 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec";
+        // 🔗 完美綁定你最新成功部署的第 26 版 GAS 正確網址
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyKYSk6wAUew42YMxgJL9WSS0EVnVKLbpomF-hrgMG0FizHBw/exec";
+
         let memberCount = 0;
         let calculatedData = [];
         let globalHistoryRawData = []; 
-        let currentEditingId = null;  // 儲存目前正在編輯的舊 ID
+        let currentEditingId = null;  
         let isAdminUnlocked = false; 
 
         window.onload = function() {
@@ -170,7 +170,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyK
 
             const firstRow = matchingRows[0];
 
-            // 1. 解析項目標題
+            // 1. 解析項目標題 [平台][單號][餐廳]
             const title = firstRow.title || "";
             const matches = title.match(/\[(.*?)\]\[(.*?)\]\[(.*?)\]/);
             
@@ -205,14 +205,14 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyK
                 document.getElementById('otherFee').value = 0;
             }
 
-            // 3. 重新生成成員
+            // 3. 重新生成成員輸入框
             document.getElementById('membersContainer').innerHTML = '';
             matchingRows.forEach(row => {
                 const origPrice = isNaN(parseFloat(row.originalPrice)) ? '' : row.originalPrice;
                 addMemberRow(row.name, origPrice);
             });
 
-            // 🎯 強制將 ID 轉為字串存入全域變數
+            // 🎯 強制將 ID 轉為乾淨字串存入全域變數
             currentEditingId = String(idInput);
             
             document.getElementById('editModeStatus').innerHTML = `⚠️ <b>編輯模式開啟</b>：正在修改舊紀錄 (ID: ${idInput})，送出時將直接覆蓋。`;
@@ -269,6 +269,137 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyDlIMFUkQy8kpGwVM6bgyK
             document.getElementById('grandTotal').textContent = total.toFixed(1);
         }
 
-        // 🎯 核心修復：確保 customId 絕對不
-        
-        
+        // 💡 補齊被截斷的完整傳送與載入函式
+        function triggerFinalConfirm() {
+            const platform = document.getElementById('platform').value.trim();
+            const orderNo = document.getElementById('orderNo').value.trim();
+            const restaurant = document.getElementById('restaurant').value.trim();
+            
+            let finalTitle = "";
+            if (!platform && !orderNo && !restaurant) {
+                finalTitle = "未命名食飯紀錄";
+            } else {
+                finalTitle = `[${platform || '-'}]` + `[${orderNo || '-'}]` + `[${restaurant || '-'}]`;
+            }
+
+            if (calculatedData.length === 0) return alert('請先輸入成員與金額！');
+            
+            const hasActiveId = (currentEditingId !== null && currentEditingId !== undefined && currentEditingId !== "");
+            const modeText = hasActiveId ? `【覆蓋舊紀錄模式】\n注意：這會完全重寫並覆蓋 ID: ${currentEditingId} 的舊資料。` : "【新增全新紀錄】";
+
+            if (confirm(`${modeText}\n項目：${finalTitle}\n總金額：$${document.getElementById('grandTotal').textContent}\n資料將傳送至 Google Sheet。`)) {
+                
+                const payload = { 
+                    action: 'addRecord', 
+                    title: finalTitle, 
+                    data: calculatedData,
+                    rawDeliveryFee: parseFloat(document.getElementById('deliveryFee').value) || 0,
+                    rawOtherFee: parseFloat(document.getElementById('otherFee').value) || 0
+                };
+                
+                if (hasActiveId) {
+                    payload.customId = String(currentEditingId); 
+                }
+
+                fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    alert('✅ 紀錄處理完成！');
+                    
+                    document.getElementById('platform').value = "";
+                    document.getElementById('orderNo').value = "";
+                    document.getElementById('restaurant').value = "";
+                    document.getElementById('reloadId').value = "";
+                    document.getElementById('discountFee').value = 0;
+                    document.getElementById('deliveryFee').value = 0;
+                    document.getElementById('otherFee').value = 0;
+                    
+                    currentEditingId = null; 
+                    document.getElementById('editModeStatus').textContent = "目前模式：✨ 新增全新紀錄";
+                    document.getElementById('editModeStatus').className = "text-[11px] text-gray-500 mt-1";
+                    switchTab('history');
+                }).catch(err => alert('錯誤: ' + err));
+            }
+        }
+
+        function loadHistory() {
+            const listDiv = document.getElementById('historyList');
+            listDiv.innerHTML = '<p class="text-center text-gray-500">正在從 Google Sheet 同步最新狀態...</p>';
+            
+            fetch(GAS_URL).then(res => res.json()).then(data => {
+                globalHistoryRawData = data; 
+                
+                if(!data || data.length === 0) { listDiv.innerHTML = '<p class="text-center text-gray-500">暫無開支紀錄</p>'; return; }
+                
+                const groups = {};
+                data.forEach(item => {
+                    if(!groups[item.id]) groups[item.id] = { title: item.title, date: item.date, items: [] };
+                    groups[item.id].items.push(item);
+                });
+
+                listDiv.innerHTML = '';
+                Object.keys(groups).reverse().forEach(id => {
+                    const group = groups[id];
+                    let boxHTML = `<div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-3">
+                        <div class="flex justify-between text-xs font-bold text-gray-500 mb-2"><span>📅 ${group.date}</span><span class="text-indigo-500 select-all">🆔 ${id}</span><span>🏷️ ${group.title}</span></div>
+                        <div class="space-y-2">`;
+                    
+                    group.items.forEach(person => {
+                        const statusStr = (typeof person.status === 'string') ? person.status : '❌ 未付';
+                        const isPaid = statusStr.includes('✅');
+                        const statusBadge = isPaid ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200';
+                        
+                        const orig = !isNaN(parseFloat(person.originalPrice)) ? parseFloat(person.originalPrice).toFixed(1) : '0.0';
+                        const fee = !isNaN(parseFloat(person.shareFee)) ? parseFloat(person.shareFee).toFixed(1) : '0.0';
+                        const disc = !isNaN(parseFloat(person.shareDiscount)) ? parseFloat(person.shareDiscount).toFixed(1) : '0.0';
+                        const final = !isNaN(parseFloat(person.finalPrice)) ? parseFloat(person.finalPrice).toFixed(1) : '0.0';
+
+                        let timeLabelHTML = '';
+                        if (isPaid && person.updateTime && person.updateTime !== '-') {
+                            timeLabelHTML = `<div class="text-[9px] text-gray-400 text-right mt-0.5">(last update dtm: ${person.updateTime})</div>`;
+                        }
+
+                        boxHTML += `<div class="flex justify-between items-center text-xs border-b border-dashed border-gray-200 py-1">
+                            <div class="flex flex-col md:flex-row md:gap-1">
+                                <span class="font-semibold text-gray-800">${person.name}</span>
+                                <span class="text-gray-400 text-[11px]">(原價$${orig} + 雜$${fee} - 扣$${disc})</span>
+                            </div>
+                            <div class="flex flex-col items-end gap-0.5">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-bold text-indigo-600 text-sm">$${final}</span>
+                                    <button onclick="toggleStatus('${id}', '${person.name}')" class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadge} transition">${statusStr}</button>
+                                </div>
+                                ${timeLabelHTML}
+                            </div>
+                        </div>`;
+                    });
+                    boxHTML += `</div></div>`;
+                    listDiv.innerHTML += boxHTML;
+                });
+            }).catch(err => {
+                listDiv.innerHTML = `<p class="text-center text-red-500">連線錯誤: ${err} (請檢查後端 GAS 是否已正確部署為「任何人」存取)</p>`;
+            });
+        }
+
+        function toggleStatus(id, name) {
+            const password = prompt(`欲更改【${name}】的付款狀態，請輸入管理員密碼：`);
+            if (password === null) return;
+            
+            fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'updateStatus', id: id, name: name, password: password })
+            })
+            .then(res => res.json())
+            .then(resData => {
+                if (resData.status === "success") {
+                    loadHistory(); 
+                } else {
+                    alert("❌ 密碼錯誤！無法更改狀態。");
+                }
+            })
+            .catch(err => alert('更新失敗: ' + err));
+        }
+    </script>
+</body>
+</html>
